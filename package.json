@@ -1,0 +1,56 @@
+{
+  "name": "agentcompany",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20 <24",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "dev": "node scripts/run-next.cjs dev",
+    "build": "node scripts/run-next.cjs build",
+    "start": "node scripts/run-next.cjs start",
+    "lint": "node scripts/run-next.cjs lint",
+    "typecheck": "tsc --noEmit",
+    "worker": "tsx src/worker/index.ts",
+    "test": "vitest run",
+    "test:e2e": "node scripts/run-playwright.cjs test",
+    "test:e2e:ui": "node scripts/run-playwright.cjs test --ui",
+    "test:e2e:headed": "node scripts/run-playwright.cjs test --headed",
+    "test:e2e:install": "node scripts/run-playwright.cjs install chromium",
+    "smoke:providers": "tsx scripts/smoke-managed-providers.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.670.0",
+    "@prisma/client": "5.22.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.34.10",
+    "ioredis": "^5.4.1",
+    "jose": "^5.9.6",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "slugify": "^1.6.6",
+    "styled-jsx": "5.1.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.16",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.5"
+  }
+}

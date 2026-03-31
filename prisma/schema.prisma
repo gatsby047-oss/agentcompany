@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipMemberType {
+  HUMAN
+  AGENT
+}
+
+enum MembershipRole {
+  ADMIN
+  MEMBER
+  AGENT
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum AgentAuthMode {
+  TOKEN
+  NONE
+}
+
+enum AgentStatus {
+  ONLINE
+  OFFLINE
+  ERROR
+}
+
+enum ProjectStatus {
+  DRAFT
+  RUNNING
+  BLOCKED
+  COMPLETED
+  FAILED
+}
+
+enum WorkflowStatus {
+  DRAFT
+  READY
+  RUNNING
+  BLOCKED
+  COMPLETED
+  FAILED
+}
+
+enum WorkflowRunStatus {
+  QUEUED
+  RUNNING
+  BLOCKED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WorkflowNodeStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  BLOCKED
+  FAILED
+  COMPLETED
+}
+
+enum TaskRunStatus {
+  QUEUED
+  RUNNING
+  BLOCKED
+  FAILED
+  COMPLETED
+}
+
+enum PointSubjectType {
+  USER
+  COMPANY
+}
+
+model User {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  passwordHash     String        @map("password_hash")
+  displayName      String        @map("display_name")
+  avatarUrl        String?       @map("avatar_url")
+  locale           String        @default("zh-HK")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  foundedCompanies Company[]     @relation("FoundedCompanies")
+  memberships      Membership[]
+  agentInstances   AgentInstance[]
+  sentInvitations  Invitation[]  @relation("SentInvitations")
+  assignedTaskRuns TaskRun[]     @relation("AssignedUsers")
+
+  @@map("users")
+}
+
+model Company {
+  id            String       @id @default(cuid())
+  founderUserId String       @map("founder_user_id")
+  founder       User         @relation("FoundedCompanies", fields: [founderUserId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String       @unique
+  description   String?
+  score         Int          @default(0)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  memberships   Membership[]
+  invitations   Invitation[]
+  projects      Project[]
+
+  @@map("companies")
+}
+
+model Membership {
+  id              String               @id @default(cuid())
+  companyId       String               @map("company_id")
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberType      MembershipMemberType @map("member_type")
+  userId          String?              @map("user_id")
+  user            User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentInstanceId String?              @map("agent_instance_id")
+  agentInstance   AgentInstance?       @relation(fields: [agentInstanceId], references: [id], onDelete: Cascade)
+  role            MembershipRole
+  department      String?
+  status          MembershipStatus     @default(ACTIVE)
+  createdAt       DateTime             @default(now()) @map("created_at")
+  workflowNodes   WorkflowNode[]
+
+  @@unique([companyId, userId], map: "memberships_company_id_user_id_key")
+  @@unique([companyId, agentInstanceId], map: "memberships_company_id_agent_instance_id_key")
+  @@index([companyId, role])
+  @@map("memberships")
+}
+
+model Invitation {
+  id            String           @id @default(cuid())
+  companyId     String           @map("company_id")
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inviterUserId String           @map("inviter_user_id")
+  inviter       User             @relation("SentInvitations", fields: [inviterUserId], references: [id], onDelete: Cascade)
+  inviteeEmail  String           @map("invitee_email")
+  role          MembershipRole
+  token         String           @unique
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime         @map("expires_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  @@index([companyId, status])
+  @@map("invitations")
+}
+
+model AgentInstance {
+  id                  String        @id @default(cuid())
+  ownerUserId         String        @map("owner_user_id")
+  owner               User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  provider            String
+  displayName         String        @map("display_name")
+  endpointUrl         String        @map("endpoint_url")
+  authMode            AgentAuthMode @default(TOKEN) @map("auth_mode")
+  secretRef           String?       @map("secret_ref")
+  capabilitiesJson    Json?         @map("capabilities_json")
+  status              AgentStatus   @default(OFFLINE)
+  lastHeartbeatAt     DateTime?     @map("last_heartbeat_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  memberships         Membership[]
+  assignedTaskRuns    TaskRun[]     @relation("AssignedAgents")
+
+  @@index([provider, status])
+  @@map("agent_instances")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  companyId       String        @map("company_id")
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  summary         String?
+  status          ProjectStatus @default(DRAFT)
+  progressPercent Int           @default(0) @map("progress_percent")
+  startedAt       DateTime?     @map("started_at")
+  completedAt     DateTime?     @map("completed_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  workflows       Workflow[]
+  workflowRuns    WorkflowRun[]
+  taskRuns        TaskRun[]
+  projectEvents   ProjectEvent[]
+
+  @@index([companyId, status])
+  @@map("projects")
+}
+
+model Workflow {
+  id             String         @id @default(cuid())
+  projectId      String         @map("project_id")
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version        Int            @default(1)
+  status         WorkflowStatus @default(DRAFT)
+  definitionJson Json           @map("definition_json")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  nodes          WorkflowNode[]
+  edges          WorkflowEdge[]
+  runs           WorkflowRun[]
+
+  @@index([projectId, status])
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id          String            @id @default(cuid())
+  workflowId  String            @map("workflow_id")
+  workflow    Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  projectId   String            @map("project_id")
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status      WorkflowRunStatus @default(QUEUED)
+  startedAt   DateTime?         @map("started_at")
+  completedAt DateTime?         @map("completed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  taskRuns    TaskRun[]
+
+  @@index([workflowId, status])
+  @@map("workflow_runs")
+}
+
+model WorkflowNode {
+  id                 String             @id @default(cuid())
+  workflowId         String             @map("workflow_id")
+  workflow           Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  nodeKey            String             @map("node_key")
+  title              String
+  targetMembershipId String?            @map("target_membership_id")
+  targetMembership   Membership?        @relation(fields: [targetMembershipId], references: [id], onDelete: SetNull)
+  status             WorkflowNodeStatus @default(PENDING)
+  progressPercent    Int                @default(0) @map("progress_percent")
+  configJson         Json?              @map("config_json")
+  startedAt          DateTime?          @map("started_at")
+  completedAt        DateTime?          @map("completed_at")
+  lastError          String?            @map("last_error")
+  outgoingEdges      WorkflowEdge[]     @relation("WorkflowEdgeFrom")
+  incomingEdges      WorkflowEdge[]     @relation("WorkflowEdgeTo")
+  taskRuns           TaskRun[]
+
+  @@unique([workflowId, nodeKey])
+  @@index([workflowId, status])
+  @@map("workflow_nodes")
+}
+
+model WorkflowEdge {
+  id         String       @id @default(cuid())
+  workflowId String       @map("workflow_id")
+  workflow   Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromNodeId String       @map("from_node_id")
+  fromNode   WorkflowNode @relation("WorkflowEdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId   String       @map("to_node_id")
+  toNode     WorkflowNode @relation("WorkflowEdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, fromNodeId, toNodeId])
+  @@index([workflowId, toNodeId])
+  @@map("workflow_edges")
+}
+
+model TaskRun {
+  id                     String         @id @default(cuid())
+  projectId              String         @map("project_id")
+  project                Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workflowRunId          String         @map("workflow_run_id")
+  workflowRun            WorkflowRun    @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowNodeId         String         @map("workflow_node_id")
+  workflowNode           WorkflowNode   @relation(fields: [workflowNodeId], references: [id], onDelete: Cascade)
+  assignedAgentInstanceId String?       @map("assigned_agent_instance_id")
+  assignedAgentInstance  AgentInstance? @relation("AssignedAgents", fields: [assignedAgentInstanceId], references: [id], onDelete: SetNull)
+  assignedUserId         String?        @map("assigned_user_id")
+  assignedUser           User?          @relation("AssignedUsers", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  runNo                  Int            @default(1) @map("run_no")
+  status                 TaskRunStatus  @default(QUEUED)
+  progressPercent        Int            @default(0) @map("progress_percent")
+  inputJson              Json?          @map("input_json")
+  outputJson             Json?          @map("output_json")
+  logObjectKey           String?        @map("log_object_key")
+  artifactManifestJson   Json?          @map("artifact_manifest_json")
+  queuedAt               DateTime       @default(now()) @map("queued_at")
+  startedAt              DateTime?      @map("started_at")
+  completedAt            DateTime?      @map("completed_at")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  projectEvents          ProjectEvent[]
+
+  @@index([projectId, status])
+  @@index([workflowNodeId, runNo])
+  @@map("task_runs")
+}
+
+model ProjectEvent {
+  id          BigInt    @id @default(autoincrement())
+  projectId   String    @map("project_id")
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskRunId   String?   @map("task_run_id")
+  taskRun     TaskRun?  @relation(fields: [taskRunId], references: [id], onDelete: SetNull)
+  eventType   String    @map("event_type")
+  payloadJson Json      @map("payload_json")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([projectId, id])
+  @@map("project_events")
+}
+
+model PointLedger {
+  id          String           @id @default(cuid())
+  subjectType PointSubjectType @map("subject_type")
+  subjectId   String           @map("subject_id")
+  delta       Int
+  reason      String
+  refType     String?          @map("ref_type")
+  refId       String?          @map("ref_id")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([subjectType, subjectId, createdAt])
+  @@map("point_ledgers")
+}
+
+model LeaderboardSnapshot {
+  id          String           @id @default(cuid())
+  scope       String
+  subjectType PointSubjectType @map("subject_type")
+  subjectId   String           @map("subject_id")
+  score       Int
+  rank        Int
+  snapshotAt  DateTime         @default(now()) @map("snapshot_at")
+
+  @@index([scope, snapshotAt])
+  @@map("leaderboard_snapshots")
+}

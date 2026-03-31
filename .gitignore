@@ -1,0 +1,17 @@
+node_modules
+.cursor
+.next
+coverage
+.pnpm-store
+.playwright-browsers-local
+playwright-report
+test-results
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+*.tsbuildinfo
+var
+Microsoft

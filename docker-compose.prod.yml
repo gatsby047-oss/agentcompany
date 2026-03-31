@@ -1,0 +1,66 @@
+x-app-environment: &app-environment
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  APP_URL: ${APP_URL}
+  AUTH_SECRET: ${AUTH_SECRET}
+  AGENT_CALLBACK_SECRET: ${AGENT_CALLBACK_SECRET:-}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+  STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_REGION: ${S3_REGION:-auto}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  HEARTBEAT_INTERVAL_SECONDS: ${HEARTBEAT_INTERVAL_SECONDS:-20}
+  HEARTBEAT_TTL_SECONDS: ${HEARTBEAT_TTL_SECONDS:-40}
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+  TASK_MAX_RETRIES: ${TASK_MAX_RETRIES:-2}
+
+services:
+  app:
+    image: agentcompany:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment: *app-environment
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - app_storage:/app/var
+    restart: unless-stopped
+
+  worker:
+    image: agentcompany:latest
+    command: ["tsx", "src/worker/index.ts"]
+    environment: *app-environment
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - app_storage:/app/var
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentcompany}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agentcompany}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_storage:
