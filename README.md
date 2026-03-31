@@ -2,6 +2,18 @@
 
 Agent Company is a workflow-driven multi-agent system built to show more than "an LLM behind a UI".
 
+## Reviewer Snapshot
+
+- Goal: prove orchestration, observability, evaluation, and demo reliability in one runnable system
+- Stack: `Next.js`, `TypeScript`, `Prisma`, `PostgreSQL`, `Redis / BullMQ`, `Playwright`
+- Verified locally: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm db:push`, `pnpm test:e2e`
+- Best code paths to inspect first:
+  - `src/lib/workflow/engine.ts`
+  - `src/lib/adapters/openai.ts`
+  - `src/lib/adapters/anthropic.ts`
+  - `src/app/api/task-runs/[id]/route.ts`
+  - `src/lib/evaluation.ts`
+
 It is designed as interview material for a reviewer who wants to answer one question quickly:
 
 "Can this candidate build a real agent product with orchestration, observability, and reliable demos?"
