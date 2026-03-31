@@ -1,24 +1,21 @@
-﻿# Local Development
+# Local Development
 
 This document explains the recommended local setup for the interview edition of Agent Company.
 
----
-
 ## Recommended Environment
 
-- Node `22.x`
+- Node `22.x` via `.nvmrc` for the lowest-friction demo path
+- Node `24.x` is also accepted by `package.json#engines`
 - pnpm `10.x`
 - Docker Desktop
 
 The repository currently declares:
 
 - `.nvmrc` -> `22`
-- `package.json#engines.node` -> `>=20 <24`
+- `package.json#engines.node` -> `>=22 <25`
 - `package.json#engines.pnpm` -> `>=10 <11`
 
-Node `24.x` may still work for some commands, but it produces an engine warning and is not the preferred demo environment.
-
----
+The recommendation stays on Node `22.x` because it is the most predictable demo path. The broader engine range exists so newer local machines do not fail immediately on a slightly newer installed Node release.
 
 ## Services Used Locally
 
@@ -39,8 +36,6 @@ Recommended ports:
 | MinIO Console | `9001` |
 
 The interview build standardizes on `3001` for the web app so local runs and E2E runs are easier to reason about.
-
----
 
 ## Environment Variables
 
@@ -74,8 +69,6 @@ ANTHROPIC_MODEL="claude-sonnet-4-6"
 ```
 
 If local PostgreSQL `5432` is already occupied, move Docker PostgreSQL to `15432` and update `DATABASE_URL` to match.
-
----
 
 ## Standard Local Boot Flow
 
@@ -119,8 +112,6 @@ pnpm worker
 
 Open the app at `http://127.0.0.1:3001`.
 
----
-
 ## Common Commands
 
 ```powershell
@@ -130,11 +121,9 @@ pnpm worker
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm test:e2e
 pnpm build
-pnpm db:migrate:dev
-pnpm db:migrate:deploy
 pnpm db:push
+pnpm test:e2e
 ```
 
 Managed provider smoke tests:
@@ -144,8 +133,6 @@ pnpm smoke:providers
 pnpm smoke:providers -- --provider openai
 pnpm smoke:providers -- --provider anthropic --keep-data
 ```
-
----
 
 ## What To Verify Before A Demo
 
@@ -168,10 +155,9 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+pnpm db:push
 pnpm test:e2e
 ```
-
----
 
 ## E2E Notes
 
@@ -195,9 +181,7 @@ That means:
 - browser setup is explicit
 - demo risk is lower because the startup path is predictable
 
-As of `2026-03-31`, `pnpm test:e2e` passes in `E:\77work\workwork\git_agentcompany`.
-
----
+The commands in this document were re-validated against the standard local stack for this interview edition.
 
 ## Related Docs
 

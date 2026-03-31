@@ -1,8 +1,6 @@
-﻿# Interview Playbook
+# Interview Playbook
 
 This playbook is designed for interviewers and for a live demo setting. It assumes you want to show the engineering value of the project quickly, without hiding the real product surface area.
-
----
 
 ## What This Repo Proves
 
@@ -20,8 +18,6 @@ This project is stronger than a basic LLM demo because it combines five things i
    - The project aggregates success rate, retry rate, latency, queue delay, and cost.
 5. Demo reliability
    - Local startup, Playwright, and version expectations were aligned to reduce live-demo risk.
-
----
 
 ## Recommended Demo Story
 
@@ -43,8 +39,6 @@ Use this story when you want an interviewer to understand your value in about fi
    - Show success rate, latency, retry rate, queue delay, and per-provider cost.
 
 This sequence tells a clean engineering story: product modeling, backend orchestration, LLM integration, observability, and operational thinking.
-
----
 
 ## Fast Setup For A Live Demo
 
@@ -83,8 +77,6 @@ Open:
 - App: `http://127.0.0.1:3001`
 - Health: `http://127.0.0.1:3001/api/health`
 
----
-
 ## Provider Smoke Commands
 
 Run OpenAI only:
@@ -111,8 +103,6 @@ Keep generated demo data so the dashboard has something to inspect:
 pnpm smoke:providers -- --provider openai --keep-data
 ```
 
----
-
 ## Suggested Talking Points
 
 ### 30-second summary
@@ -138,8 +128,6 @@ Tool calls allow the model to fetch project snapshot data, recent events, and ta
 
 In interviews, a strong feature can still fail to land if local startup is flaky. This version of the repo includes version alignment, a single E2E startup path, and browser setup steps so the project is easier to demonstrate with confidence.
 
----
-
 ## Backup Plan If Live Provider Calls Fail
 
 If network conditions or API keys make a live provider demo risky, keep the interview useful by showing:
@@ -150,8 +138,6 @@ If network conditions or API keys make a live provider demo risky, keep the inte
 
 That still proves system design, observability, and evaluation maturity even if you avoid a fresh external call in the moment.
 
----
-
 ## Pre-Interview Validation
 
 Run this before the interview:
@@ -161,7 +147,8 @@ pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+pnpm db:push
 pnpm test:e2e
 ```
 
-Validated successfully in this interview repo on `2026-03-31`.
+The commands above were re-run successfully on the standard local stack for this interview edition.

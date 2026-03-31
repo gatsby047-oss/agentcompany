@@ -1,295 +1,260 @@
 # Deployment Guide
 
+This guide covers the two deployment shapes that matter for this repository:
+
+- Docker Compose on a single host
+- manual app plus worker deployment against existing PostgreSQL and Redis services
+
+## Recommended Deployment Shapes
+
+### Fastest path: Docker Compose
+
+Use `docker-compose.prod.yml` when you want the quickest reproducible setup for:
+
+- one web process
+- one worker process
+- one PostgreSQL instance
+- one Redis instance
+
+This is the easiest production-like deployment for demos, internal reviews, and small environments.
+
+### Existing infrastructure path
+
+Use manual deployment when you already have:
+
+- managed PostgreSQL
+- managed Redis
+- your own reverse proxy or load balancer
+- your own object storage
+
 ## Prerequisites
 
-- Node.js 18+ (for local development)
-- PostgreSQL 15+
-- Redis 7+
-- Docker & Docker Compose (for containerized deployment)
-- (Optional) S3-compatible storage (MinIO, AWS S3)
+### Docker Compose path
 
-## Quick Start (Docker Compose)
+- Docker Engine or Docker Desktop with Compose v2
 
-### 1. Clone and Configure
+### Manual deployment path
+
+- Node `22.x`
+- pnpm `10.x`
+- PostgreSQL `15+`
+- Redis `7+`
+- optional S3-compatible storage
+
+## Runtime Topology
+
+```mermaid
+flowchart LR
+  U["Users"] --> LB["Reverse proxy or load balancer"]
+  LB --> A["Web/API"]
+  A --> D["PostgreSQL"]
+  A --> R["Redis"]
+  A --> O["Object storage"]
+  W["Worker"] --> D
+  W --> R
+  W --> O
+  W --> P["Managed provider or external agent"]
+  P --> A
+```
+
+## Docker Compose Deployment
+
+### 1. Prepare the environment
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd agentcompany
-
-# Copy environment file
 cp .env.example .env.production
-
-# Edit production environment variables
-# See Environment Variables section below
 ```
 
-### 2. Deploy with Docker Compose
+Edit `.env.production` before deployment.
+
+When using `docker-compose.prod.yml`, make sure internal service URLs use Docker service names such as `db` and `redis` instead of `127.0.0.1`.
+
+Example:
+
+```env
+DATABASE_URL="postgresql://agentcompany:${POSTGRES_PASSWORD}@db:5432/agentcompany?schema=public"
+REDIS_URL="redis://redis:6379"
+APP_URL="https://your-domain.example"
+AUTH_SECRET="replace-with-a-long-random-secret"
+ENCRYPTION_KEY="replace-with-32-hex-or-random-bytes"
+STORAGE_DRIVER="local"
+```
+
+### 2. Build and start the stack
 
 ```bash
-# Build and start web + worker + dependencies
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-
-# View logs
-docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
-
-# Stop services
-docker compose --env-file .env.production -f docker-compose.prod.yml down
 ```
 
-### 3. Verify Deployment
+### 3. Run production migrations
 
 ```bash
-# Health check
-curl http://localhost:3000/api/health
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app pnpm db:migrate:deploy
+```
 
-# Extended health (includes DB and Redis)
+### 4. Verify health
+
+```bash
+curl http://localhost:3000/api/health
 curl http://localhost:3000/api/health/extended
 ```
 
-## Environment Variables
-
-Copy `.env.example` to `.env.production` and configure the following:
-
-When using `docker-compose.prod.yml`, make sure container-to-container URLs use service names such as `db` and `redis` instead of `127.0.0.1`.
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
-| `REDIS_URL` | Redis connection string | Yes | - |
-| `APP_URL` | Public-facing application URL | Yes | - |
-| `AUTH_SECRET` | Authentication secret (32+ chars) | Yes | - |
-| `AGENT_CALLBACK_SECRET` | Secret for agent callbacks | No | - |
-| `ENCRYPTION_KEY` | 32-character encryption key | Yes | - |
-| `STORAGE_DRIVER` | Storage driver: `local` or `s3` | No | `local` |
-| `S3_ENDPOINT` | S3/MinIO endpoint URL | No | - |
-| `S3_REGION` | S3 region | No | `auto` |
-| `S3_BUCKET` | S3 bucket name | No | - |
-| `S3_ACCESS_KEY` | S3 access key | No | - |
-| `S3_SECRET_KEY` | S3 secret key | No | - |
-| `HEARTBEAT_INTERVAL_SECONDS` | Agent heartbeat interval | No | `20` |
-| `HEARTBEAT_TTL_SECONDS` | Agent heartbeat TTL | No | `40` |
-| `WORKER_CONCURRENCY` | Worker concurrency | No | `5` |
-| `TASK_MAX_RETRIES` | Max task retries | No | `2` |
-
-### Generating Secrets
+### 5. Inspect logs
 
 ```bash
-# Generate AUTH_SECRET
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY
-openssl rand -hex 16
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f
 ```
 
-## Manual Deployment (Non-Docker)
+## Manual Deployment
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
-# Install pnpm if not installed
-npm install -g pnpm
-
-# Install dependencies
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-### 2. Configure Environment
+### 2. Configure the environment
 
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+cp .env.example .env.production
 ```
 
-### 3. Run Database Migrations
+At minimum, configure:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `APP_URL`
+- `AUTH_SECRET`
+- `ENCRYPTION_KEY`
+
+### 3. Run database migrations
 
 ```bash
-# Development
-pnpm db:migrate:dev
-
-# Production
 pnpm db:migrate:deploy
 ```
 
-### 4. Build and Start
+### 4. Build the app
 
 ```bash
-# Build the application
 pnpm build
+```
 
-# Start production server
+### 5. Start web and worker
+
+Terminal 1:
+
+```bash
 pnpm start
+```
 
-# In a second terminal, start the worker
+Terminal 2:
+
+```bash
 pnpm worker
 ```
 
-## Using the Deploy Script
+Put a reverse proxy in front of the web process and make sure both processes point at the same PostgreSQL and Redis instances.
 
-### Linux/Mac
+## Environment Variables
 
-```bash
-# Make the script executable
-chmod +x scripts/deploy.sh
+| Variable | Purpose | Required |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `REDIS_URL` | Redis connection string | Yes |
+| `APP_URL` | Public application URL | Yes |
+| `AUTH_SECRET` | Session/auth secret | Yes |
+| `AGENT_CALLBACK_SECRET` | Optional callback guard | No |
+| `ENCRYPTION_KEY` | Encryption key for sensitive values | Yes |
+| `STORAGE_DRIVER` | `local` or `s3` | No |
+| `S3_ENDPOINT` | S3 or MinIO endpoint | No |
+| `S3_REGION` | S3 region | No |
+| `S3_BUCKET` | Storage bucket | No |
+| `S3_ACCESS_KEY` | S3 access key | No |
+| `S3_SECRET_KEY` | S3 secret key | No |
+| `HEARTBEAT_INTERVAL_SECONDS` | Agent heartbeat interval | No |
+| `HEARTBEAT_TTL_SECONDS` | Agent heartbeat timeout | No |
+| `WORKER_CONCURRENCY` | Worker concurrency | No |
+| `TASK_MAX_RETRIES` | Max task retries | No |
 
-# Run the deployment
-./scripts/deploy.sh
-```
-
-### Windows
-
-```cmd
-scripts\deploy.bat
-```
-
-The deploy script will:
-1. Validate environment variables
-2. Build the Docker image
-3. Run database migrations
-4. Start web + worker containers
-5. Wait for the application to be ready
-6. Display deployment status
-
-## Production Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Load Balancer (Optional)                │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Compose Network                    │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐    │
-│  │   Web/API    │   │   Worker     │   │   MinIO      │    │
-│  │   (Next.js)  │   │   (BullMQ)  │   │   (Storage) │    │
-│  └──────────────┘   └──────────────┘   └──────────────┘    │
-│         │                  │                                 │
-│         └──────────────────┼─────────────────────────────┐  │
-│                            │                              │  │
-│                      ┌─────▼─────┐                  ┌────▼──┐│
-│                      │  Redis     │                  │PostgreS││
-│                      │ (Queue +   │                  │  DB   ││
-│                      │  Pub/Sub)  │                  └────▲──┘│
-│                      └───────────┘                       │  │
-└───────────────────────────────────────────────────────────┘  │
-                              │                                │
-                              ▼                                │
-┌─────────────────────────────────────────────────────────────┐
-│                   External Services                         │
-│  ┌──────────────┐   ┌──────────────┐                       │
-│  │  OpenClaw    │   │  Other       │                       │
-│  │  Agents      │   │  Agents      │                       │
-│  └──────────────┘   └──────────────┘                       │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Health Check
-
-After deployment, verify the application is running:
+### Secret generation
 
 ```bash
-# Basic health check
+openssl rand -base64 32
+openssl rand -hex 16
+```
+
+Use one value for `AUTH_SECRET` and one value for `ENCRYPTION_KEY`.
+
+## Health And Operations
+
+### Health endpoints
+
+```bash
 curl http://localhost:3000/api/health
-# Response: { "data": { "ok": true, "db": true, "redis": true } }
-
-# Extended health (includes DB and Redis)
 curl http://localhost:3000/api/health/extended
-# Response: { "status": "healthy|degraded", "services": { ... } }
+curl http://localhost:3000/api/health/metrics
+```
+
+### Useful Docker Compose commands
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f worker
+docker compose --env-file .env.production -f docker-compose.prod.yml restart worker
+docker compose --env-file .env.production -f docker-compose.prod.yml down
 ```
 
 ## Scaling Considerations
 
-### Vertical Scaling
+### Good enough for small deployments
 
-For small to medium deployments:
-- Use a single server with multiple CPU cores
-- Allocate 4GB+ RAM for the application
-- Use SSD for database storage
+- one web instance
+- one worker instance
+- one PostgreSQL instance
+- one Redis instance
 
-### Horizontal Scaling
+### Next scaling steps
 
-For larger deployments:
-- Run multiple Web instances behind a load balancer
-- Use Redis Cluster for high availability
-- Consider PostgreSQL read replicas
-- Use external S3-compatible storage
-
-### Monitoring Recommendations
-
-- Set up Prometheus metrics collection
-- Configure alerts for:
-  - High CPU/memory usage
-  - Database connection failures
-  - Redis queue backup
-  - Worker process failures
+- run multiple web instances behind a load balancer
+- scale workers independently from web traffic
+- move storage to S3-compatible object storage
+- add queue depth, failure-rate, and worker-heartbeat monitoring
 
 ## Troubleshooting
 
-### Database Connection Issues
+### Database issues
 
 ```bash
-# Check PostgreSQL logs
-docker-compose -f docker-compose.prod.yml logs db
-
-# Verify connection
-docker exec -it agentcompany-db-1 psql -U agentcompany -c "SELECT 1"
+docker compose --env-file .env.production -f docker-compose.prod.yml logs db
 ```
 
-### Redis Connection Issues
+Check that:
+
+- the database container is healthy
+- the connection string points to the correct host
+- migrations have been applied
+
+### Redis issues
 
 ```bash
-# Check Redis logs
-docker-compose -f docker-compose.prod.yml logs redis
-
-# Verify connection
-docker exec -it agentcompany-redis-1 redis-cli ping
+docker compose --env-file .env.production -f docker-compose.prod.yml logs redis
 ```
 
-### Session Issues
+Check that:
+
+- the worker can reach Redis
+- queue traffic is flowing
+- reconnect storms are not hiding a bad hostname
+
+### Worker issues
 
 ```bash
-# Verify AUTH_SECRET is set
-grep AUTH_SECRET .env.production
-
-# Regenerate if needed
-openssl rand -base64 32
+docker compose --env-file .env.production -f docker-compose.prod.yml logs worker
 ```
 
-### Worker Issues
+Check that:
 
-```bash
-# Check worker logs
-docker-compose -f docker-compose.prod.yml logs worker
-
-# Restart worker
-docker-compose -f docker-compose.prod.yml restart worker
-```
-
-### View All Logs
-
-```bash
-# All services
-docker-compose -f docker-compose.prod.yml logs -f
-
-# Specific service
-docker-compose -f docker-compose.prod.yml logs -f app
-```
-
-## Backup and Recovery
-
-### Database Backup
-
-```bash
-# Create backup
-docker exec -it agentcompany-db-1 pg_dump -U agentcompany agentcompany > backup.sql
-
-# Restore backup
-docker exec -i agentcompany-db-1 psql -U agentcompany agentcompany < backup.sql
-```
-
-### Volume Backup
-
-```bash
-# Backup volumes
-docker run --rm -v agentcompany_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz /data
+- provider credentials are present when using managed providers
+- callback routes are reachable if external agents are involved
+- the worker sees the same database and Redis endpoints as the web process

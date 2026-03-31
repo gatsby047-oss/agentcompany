@@ -151,15 +151,16 @@ Useful docs:
 
 ## Validation Status
 
-Validated locally on `2026-03-31`:
+The standard local verification path was re-run for this interview edition using the stack described below:
 
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm test`
 - `pnpm build`
-- `pnpm test:e2e` after local `.env`, Docker services, and `pnpm db:push`
+- `pnpm db:push`
+- `pnpm test:e2e`
 
-The verification commands were run against the standard local stack described below.
+For the E2E run, the local services were started with Docker Compose first and the Prisma schema was pushed before Playwright booted `web + worker`.
 
 ---
 
@@ -167,7 +168,8 @@ The verification commands were run against the standard local stack described be
 
 ### Recommended environment
 
-- Node `22.x`
+- Node `22.x` via `.nvmrc` for the lowest-friction demo path
+- Node `24.x` is also accepted by `package.json#engines`
 - pnpm `10.x`
 - Docker Desktop
 
